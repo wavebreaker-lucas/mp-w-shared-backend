@@ -16,6 +16,9 @@
       "window": {
         "startDragging": true
       },
+      "shell": {
+        "open": true
+      },
       "fs": {
         "all": true,
         "readFile": true,
