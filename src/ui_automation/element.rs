@@ -1,5 +1,6 @@
 #![allow(non_upper_case_globals)]
 
+use windows::core::{IUnknown, ComInterface};
 use windows::core::Result as WindowsResult;
 use windows::Win32::UI::Accessibility::*;
 use windows::Win32::System::Com::*;
@@ -16,12 +17,39 @@ pub fn get_element_info(x: i32, y: i32) -> Option<ElementInfo> {
         let automation: IUIAutomation = CoCreateInstance(&CUIAutomation, None, CLSCTX_ALL).ok()?;
         let element = automation.ElementFromPoint(POINT { x, y }).ok()?;
 
-        // Try to find the actual interactive element if we hit a container
-        let element = find_actual_interactive_element(&element).unwrap_or(element);
+        // Enhanced element finding logic
+        let element = {
+            // First try the original find_actual_interactive_element
+            let interactive = find_actual_interactive_element(&element).unwrap_or_else(|_| element.clone());
+            
+            // If not interactive, check if it's keyboard interactive (like text fields)
+            if !is_interactive_element(&interactive).unwrap_or(false) {
+                if is_keyboard_interactive(&interactive).unwrap_or(false) {
+                    interactive
+                } else {
+                    // Check parent as last resort (useful when clicking child decorations)
+                    if let Ok(tree_walker) = automation.ControlViewWalker() {
+                        if let Ok(parent) = tree_walker.GetParentElement(&interactive) {
+                            if is_interactive_element(&parent).unwrap_or(false) {
+                                parent
+                            } else {
+                                interactive
+                            }
+                        } else {
+                            interactive
+                        }
+                    } else {
+                        interactive
+                    }
+                }
+            } else {
+                interactive
+            }
+        };
 
         let mut info = ElementInfo {
-            x: Some(x),  // Wrap with Some()
-            y: Some(y),  // Wrap with Some()
+            x: Some(x),
+            y: Some(y),
             screen_context: ScreenContext::new(),
             name: String::new(),
             control_type: String::new(),
@@ -30,7 +58,7 @@ pub fn get_element_info(x: i32, y: i32) -> Option<ElementInfo> {
             window_title: get_window_title_for_element(&element),
             parent_name: String::new(),
             action_type: "click".to_string(),
-            action_category: ActionCategory::Click,  // Default to Click
+            action_category: ActionCategory::Click,
             timestamp: Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
             screenshot: capture_screenshot(x, y),
             value: String::new(),
@@ -38,7 +66,6 @@ pub fn get_element_info(x: i32, y: i32) -> Option<ElementInfo> {
             help_text: String::new(),
         };
 
-        // Rest of the code remains exactly the same...
         if let Ok(name) = element.GetCurrentPropertyValue(UIA_NamePropertyId) {
             info.name = variant_to_string(name);
         }
@@ -90,8 +117,8 @@ pub fn get_element_info(x: i32, y: i32) -> Option<ElementInfo> {
         if let Ok(checked) = element.GetCurrentPropertyValue(UIA_ToggleToggleStatePropertyId) {
             if checked.Anonymous.Anonymous.vt == VARENUM(VT_I4.0) {
                 match checked.Anonymous.Anonymous.Anonymous.lVal {
-                    1 => states.push("checked"),        // ToggleState_On
-                    2 => states.push("indeterminate"),  // ToggleState_Indeterminate
+                    1 => states.push("checked"),
+                    2 => states.push("indeterminate"),
                     _ => {}
                 }
             }
@@ -104,6 +131,30 @@ pub fn get_element_info(x: i32, y: i32) -> Option<ElementInfo> {
         }
 
         Some(info)
+    }
+}
+
+// New helper function
+fn is_keyboard_interactive(element: &IUIAutomationElement) -> WindowsResult<bool> {
+    
+    unsafe {
+        // Check for keyboard usable pattern
+        let value_pattern: Result<IUnknown, _> = element.GetCurrentPattern(UIA_ValuePatternId);
+        if let Ok(unknown) = value_pattern {
+            if unknown.cast::<IUIAutomationValuePattern>().is_ok() {
+                return Ok(true);
+            }
+        }
+
+        // Check for text pattern
+        let text_pattern: Result<IUnknown, _> = element.GetCurrentPattern(UIA_TextPatternId);
+        if let Ok(unknown) = text_pattern {
+            if unknown.cast::<IUIAutomationTextPattern>().is_ok() {
+                return Ok(true);
+            }
+        }
+
+        Ok(false)
     }
 }
 
