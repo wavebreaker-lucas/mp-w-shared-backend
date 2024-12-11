@@ -10,11 +10,11 @@ use models::state::{TrackingState, WindowState};
 use serde::Serialize;
 use url::Url;
 
-#[derive(Debug, Serialize, Clone)]  // Added Clone here
-struct DeepLinkPayload {
-    guide_id: String,
-    position: i32,
-    auth_token: String,
+#[derive(Debug, Serialize, Clone)]
+pub struct DeepLinkPayload {
+    pub guide_id: String,
+    pub position: i32,
+    pub auth_token: String,
 }
 
 pub fn run() {
@@ -33,8 +33,8 @@ pub fn run() {
                     let params: std::collections::HashMap<_, _> = parsed.query_pairs().collect();
                     
                     let payload = DeepLinkPayload {
-                        guide_id: params.get("guideId")
-                            .ok_or("Missing guideId".to_string())?
+                        guide_id: params.get("guide_id")
+                            .ok_or("Missing guide id".to_string())?
                             .to_string(),
                         position: params.get("position")
                             .ok_or("Missing position".to_string())?
@@ -79,6 +79,7 @@ pub fn run() {
             commands::tracking::toggle_pause,
             commands::tracking::enter_compact_mode,
             commands::guide::load_guides,
+            commands::debug::debug_deep_link,  // Note the debug:: prefix
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
