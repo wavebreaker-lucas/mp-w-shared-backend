@@ -134,6 +134,7 @@ impl InputTracker {
     }
 
     fn handle_click(&mut self, app_handle: &AppHandle, point: POINT, is_right_click: bool) -> Result<(), Error> {
+        // 1. Check if we should process this click (debouncing)
         let now = Instant::now();
         if now.duration_since(self.emitter.last_click_time).as_millis() <= CLICK_DEBOUNCE_TIME {
             return Ok(());
@@ -142,6 +143,11 @@ impl InputTracker {
         let click_type = if is_right_click { "right_click" } else { "click" };
         println!("[INPUT][{}ms] {} at ({}, {})", get_timestamp(), click_type, point.x, point.y);
         
+        // 2. Capture screenshot IMMEDIATELY after detecting click
+        // This happens before any processing or UI changes can occur
+        let screenshot = capture_screenshot(point.x, point.y);
+        
+        // 3. Get element info and process the click
         if let Some(mut element_info) = get_element_info(point.x, point.y) {
             if Self::should_skip_window(&element_info) {
                 println!("[INPUT][{}ms] Skipping app window click", get_timestamp());
@@ -151,9 +157,17 @@ impl InputTracker {
             println!("[INPUT][{}ms] Clicked {} element", get_timestamp(), element_info.control_type);
             element_info.action_category = ActionCategory::Click;
             element_info.action_type = click_type.to_string();
+            // 4. Use the screenshot we captured earlier
+            element_info.screenshot = screenshot;
+            
+            // 5. Small delay to ensure UI state is stable
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            
+            // 6. Emit the event with everything prepared
             self.emitter.emit_event(app_handle, element_info)?;
         }
     
+        // 7. Update last click time
         self.emitter.last_click_time = now;
         Ok(())
     }
