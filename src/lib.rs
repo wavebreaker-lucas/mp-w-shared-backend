@@ -24,7 +24,8 @@ pub fn run() {
     tauri::Builder::default()
         .manage(tracking_state)
         .manage(WindowState::default())
-        .register_uri_scheme_protocol("matapass", move |app_handle, request| {
+        .register_uri_scheme_protocol("matapass", move |app_handle, request| -> Result<Response, Box<dyn std::error::Error>> {
+            // Get the URL from the request
             let url = request.uri().to_string();
             
             match Url::parse(&url) {
@@ -44,13 +45,12 @@ pub fn run() {
                             .to_string(),
                     };
 
-                    // Replace the window creation code with this
                     let window = if let Some(main_window) = app_handle.get_window("main") {
                         main_window
                     } else {
                         tauri::WindowBuilder::new(
                             app_handle,
-                            "main",  // Changed from "recorder" to "main"
+                            "main",
                             tauri::WindowUrl::App("index.html".into())
                         ).build()?
                     };

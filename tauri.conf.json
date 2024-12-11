@@ -30,6 +30,10 @@
           "$LOCALDATA/*",
           "$DOCUMENT/*"
         ]
+      },
+      "protocol": {
+        "assetScope": ["**"],
+        "asset": true
       }
     },
     "bundle": {
