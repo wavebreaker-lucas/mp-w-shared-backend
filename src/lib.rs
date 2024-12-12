@@ -55,15 +55,11 @@ pub fn run() {
         .manage(tracking_state)
         .manage(WindowState::default())
         .setup(move |app| {
-            // Register protocol handler
+            // Only use one protocol registration method
             if let Err(e) = protocol::register_protocol_handler() {
                 eprintln!("Failed to register protocol handler: {}", e);
             }
 
-            // Prepare deep link plugin first
-            tauri_plugin_deep_link::prepare("matapass");
-
-            // Then register deep link handler
             let handle = app.handle().clone();
             tauri_plugin_deep_link::register("matapass", move |request| {
                 if let Ok(parsed) = Url::parse(&request) {
@@ -81,20 +77,29 @@ pub fn run() {
                             .unwrap_or_default(),
                     };
 
-                    // Save payload to disk before handling
-                    if let Err(e) = payload.save_to_disk() {
-                        eprintln!("Failed to save deep link data: {}", e);
-                    }
+                    // Save payload asynchronously
+                    let payload_clone = payload.clone();
+                    std::thread::spawn(move || {
+                        if let Err(e) = payload_clone.save_to_disk() {
+                            eprintln!("Failed to save deep link data: {}", e);
+                        }
+                    });
 
                     if let Some(window) = handle.get_window("main") {
                         window.emit("deep-link-payload", payload).ok();
                     } else {
-                        if let Ok(window) = tauri::WindowBuilder::new(
+                        // Create window and wait for it to be ready
+                        match tauri::WindowBuilder::new(
                             &handle,
                             "main",
                             tauri::WindowUrl::App("index.html".into())
                         ).build() {
-                            window.emit("deep-link-payload", payload).ok();
+                            Ok(window) => {
+                                // Give the window a moment to initialize
+                                std::thread::sleep(std::time::Duration::from_millis(500));
+                                window.emit("deep-link-payload", payload).ok();
+                            }
+                            Err(e) => eprintln!("Failed to create window: {}", e),
                         }
                     }
                 }
@@ -113,7 +118,7 @@ pub fn run() {
             commands::tracking::enter_compact_mode,
             commands::guide::load_guides,
             commands::debug::debug_deep_link,
-            get_launch_details, // Add the new command
+            get_launch_details,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
