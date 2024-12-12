@@ -33,7 +33,8 @@
       },
       "protocol": {
         "assetScope": ["**"],
-        "asset": true
+        "asset": true,
+        "all": true
       }
     },
     "bundle": {
