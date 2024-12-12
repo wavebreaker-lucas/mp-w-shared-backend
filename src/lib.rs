@@ -15,6 +15,7 @@ pub struct DeepLinkPayload {
     pub guide_id: String,
     pub position: i32,
     pub auth_token: String,
+    pub total_steps: i32,  // Add this field
 }
 
 pub fn run() {
@@ -43,6 +44,10 @@ pub fn run() {
                         auth_token: params.get("auth_token")
                             .ok_or("Missing auth token".to_string())?
                             .to_string(),
+                        total_steps: params.get("total_steps")  // Add this parameter
+                            .ok_or("Missing total steps".to_string())?
+                            .parse()
+                            .map_err(|_| "Invalid total steps".to_string())?,
                     };
 
                     let window = if let Some(main_window) = app_handle.get_window("main") {
@@ -79,7 +84,7 @@ pub fn run() {
             commands::tracking::toggle_pause,
             commands::tracking::enter_compact_mode,
             commands::guide::load_guides,
-            commands::debug::debug_deep_link,  // Note the debug:: prefix
+            commands::debug::debug_deep_link,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
