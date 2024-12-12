@@ -3,7 +3,6 @@ pub mod ui_automation;
 pub mod screenshot;
 pub mod commands;
 pub mod tracking;
-mod protocol;
 
 use std::fs;
 use tauri::Manager;
@@ -55,10 +54,8 @@ pub fn run() {
         .manage(tracking_state)
         .manage(WindowState::default())
         .setup(move |app| {
-            // Only use one protocol registration method
-            if let Err(e) = protocol::register_protocol_handler() {
-                eprintln!("Failed to register protocol handler: {}", e);
-            }
+            // First prepare the deep link plugin
+            tauri_plugin_deep_link::prepare("matapass");
 
             let handle = app.handle().clone();
             tauri_plugin_deep_link::register("matapass", move |request| {
@@ -87,17 +84,21 @@ pub fn run() {
 
                     if let Some(window) = handle.get_window("main") {
                         window.emit("deep-link-payload", payload).ok();
+                        window.unminimize().ok();
+                        window.show().ok();
+                        window.set_focus().ok();
                     } else {
-                        // Create window and wait for it to be ready
                         match tauri::WindowBuilder::new(
                             &handle,
                             "main",
                             tauri::WindowUrl::App("index.html".into())
                         ).build() {
                             Ok(window) => {
-                                // Give the window a moment to initialize
                                 std::thread::sleep(std::time::Duration::from_millis(500));
                                 window.emit("deep-link-payload", payload).ok();
+                                window.unminimize().ok();
+                                window.show().ok();
+                                window.set_focus().ok();
                             }
                             Err(e) => eprintln!("Failed to create window: {}", e),
                         }
