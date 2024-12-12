@@ -13,9 +13,8 @@ use url::Url;
 #[derive(Debug, Serialize, Clone)]
 pub struct DeepLinkPayload {
     pub guide_id: String,
-    pub position: i32,
     pub auth_token: String,
-    pub total_steps: i32,  // Add this field
+    pub total_steps: i32,
 }
 
 pub fn run() {
@@ -37,14 +36,10 @@ pub fn run() {
                         guide_id: params.get("guide_id")
                             .ok_or("Missing guide id".to_string())?
                             .to_string(),
-                        position: params.get("position")
-                            .ok_or("Missing position".to_string())?
-                            .parse()
-                            .map_err(|_| "Invalid position".to_string())?,
                         auth_token: params.get("auth_token")
                             .ok_or("Missing auth token".to_string())?
                             .to_string(),
-                        total_steps: params.get("total_steps")  // Add this parameter
+                        total_steps: params.get("total_steps")
                             .ok_or("Missing total steps".to_string())?
                             .parse()
                             .map_err(|_| "Invalid total steps".to_string())?,
